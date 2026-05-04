@@ -44,7 +44,28 @@ Run it with:
 pnpm --filter @school/api dev
 ```
 
+Run it locally with Doppler-managed secrets:
+
+```bash
+pnpm --filter @school/api doppler:run
+```
+
+Run database migrations with the dedicated migration config:
+
+```bash
+pnpm --filter @school/db doppler:migrate
+```
+
+Use the same config for rollback or reset:
+
+```bash
+pnpm --filter @school/db doppler:rollback
+pnpm --filter @school/db doppler:reset
+```
+
 Configure a Clerk webhook for `user.created` and `user.updated`, then set `CLERK_WEBHOOK_SIGNING_SECRET` along with the existing `PG_*` database environment variables for the API app.
+
+For Vercel, Doppler must sync secrets into the API Vercel project environment. Running the build through Doppler is not enough for runtime serverless functions; `process.env` in the deployed function reads Vercel project environment variables.
 
 On Vercel, create a second project for the same repository with Root Directory set to `apps/api`. Use that API project's domain for Clerk:
 

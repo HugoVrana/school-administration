@@ -6,6 +6,8 @@
   "scripts": {
     "build": "tsc --noEmit",
     "dev": "tsx watch src/dev-server.ts",
+    "doppler:pull": "doppler secrets download --no-file --format env-no-quotes > .env.local",
+    "doppler:run": "doppler run -- tsx watch src/dev-server.ts",
     "start": "tsx src/dev-server.ts",
     "lint": "eslint",
     "typecheck": "tsc --noEmit"

@@ -1,5 +1,4 @@
 import { createRoute, type OpenAPIHono, z } from '@hono/zod-openapi'
-import { handleClerkWebhookRequest } from '../../services/clerk-user-sync.js'
 import { ErrorResponseSchema } from '../../schemas/common.js'
 
 const SvixHeadersSchema = z.object({
@@ -90,6 +89,7 @@ const clerkWebhookRoute = createRoute({
 
 export function registerClerkWebhookRoutes(app: OpenAPIHono): void {
   app.openapi(clerkWebhookRoute, async (c) => {
+    const { handleClerkWebhookRequest } = await import('../../services/clerk-user-sync.js')
     const result = await handleClerkWebhookRequest(c.req.raw)
 
     return c.json(result, 200)

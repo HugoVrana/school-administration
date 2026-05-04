@@ -3,19 +3,29 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./migrate": "./src/migrate.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./migrate": {
+      "types": "./dist/migrate.d.ts",
+      "import": "./dist/migrate.js"
+    }
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "db:pull-secrets" : "doppler secrets download --no-file --format env-no-quotes > .env.local",
-    "db:migrate": "doppler run -- tsx src/migrate.ts up",
-    "db:rollback": "doppler run -- tsx src/migrate.ts down",
-    "db:reset": "doppler run -- tsx src/migrate.ts reset"
+    "db:pull-secrets": "doppler secrets download --no-file --format env-no-quotes > .env.local",
+    "db:migrate": "tsx src/migrate.ts up",
+    "db:rollback": "tsx src/migrate.ts down",
+    "db:reset": "tsx src/migrate.ts reset",
+    "doppler:migrate": "doppler run -c dev_dbmigration -- pnpm db:migrate",
+    "doppler:rollback": "doppler run -c dev_dbmigration -- pnpm db:rollback",
+    "doppler:reset": "doppler run -c dev_dbmigration -- pnpm db:reset"
   },
   "dependencies": {
     "kysely": "^0.28.16",
@@ -31,4 +41,3 @@
     "typescript-eslint": "^8.54.0"
   }
 }
-
