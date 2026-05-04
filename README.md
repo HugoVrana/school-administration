@@ -30,6 +30,8 @@ It exposes a Clerk webhook endpoint that stores registered users in the applicat
 POST /api/webhooks/clerk
 ```
 
+Incoming Clerk deliveries are recorded in the `clerk_webhook_events` table using the `svix-id` header for idempotency. The current dispatcher processes `user.created` and `user.updated` by syncing the Clerk user into `users`; unsupported event types are stored and marked as ignored.
+
 Swagger UI is available at:
 
 ```txt
