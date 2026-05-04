@@ -22,7 +22,7 @@ import { Button } from "@workspace/ui/components/button";
 
 ## Clerk user sync
 
-The API app is a Hono service. Vercel deploys the default export from `apps/api/src/app.ts`, and routes are registered there.
+The API app is a Hono service. Routes are registered in `apps/api/src/app.ts`, and Vercel serves them through the catch-all function at `apps/api/api/[[...route]].ts`.
 
 It exposes a Clerk webhook endpoint that stores registered users in the application database:
 
