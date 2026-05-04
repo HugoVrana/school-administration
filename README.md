@@ -28,6 +28,12 @@ The API app exposes a Clerk webhook endpoint that stores registered users in the
 POST /api/webhooks/clerk
 ```
 
+Swagger UI is available at:
+
+```txt
+GET /api/docs
+```
+
 Run it with:
 
 ```bash

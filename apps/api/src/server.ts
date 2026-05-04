@@ -1,4 +1,5 @@
 import { closeDb, handleClerkWebhookRequest, HttpError, validateEnvironment } from './clerk-user-sync.js'
+import { openApiDocument, swaggerUiHtml } from './openapi.js'
 import { createServer, type IncomingHttpHeaders, type IncomingMessage, type ServerResponse } from 'node:http'
 
 validateEnvironment()
@@ -7,12 +8,29 @@ const port = Number(process.env.PORT ?? 4000)
 
 const server = createServer(async (request, response) => {
   try {
-    if (request.method === 'GET' && request.url === '/health') {
+    const pathname = getPathname(request)
+
+    if (request.method === 'GET' && (pathname === '/' || pathname === '/api')) {
+      redirect(response, '/api/docs')
+      return
+    }
+
+    if (request.method === 'GET' && (pathname === '/health' || pathname === '/api/health')) {
       sendJson(response, 200, { ok: true })
       return
     }
 
-    if (request.method === 'POST' && request.url === '/api/webhooks/clerk') {
+    if (request.method === 'GET' && pathname === '/api/openapi') {
+      sendJson(response, 200, openApiDocument)
+      return
+    }
+
+    if (request.method === 'GET' && pathname === '/api/docs') {
+      sendHtml(response, 200, swaggerUiHtml())
+      return
+    }
+
+    if (request.method === 'POST' && pathname === '/api/webhooks/clerk') {
       await handleClerkWebhook(request)
       sendJson(response, 200, { received: true })
       return
@@ -59,6 +77,10 @@ function getRequestUrl(request: IncomingMessage): string {
   return `http://${host}${request.url ?? '/'}`
 }
 
+function getPathname(request: IncomingMessage): string {
+  return new URL(getRequestUrl(request)).pathname
+}
+
 function toHeaders(headers: IncomingHttpHeaders): Headers {
   const normalizedHeaders = new Headers()
 
@@ -76,6 +98,16 @@ function toHeaders(headers: IncomingHttpHeaders): Headers {
 function sendJson(response: ServerResponse, status: number, body: unknown): void {
   response.writeHead(status, { 'content-type': 'application/json' })
   response.end(JSON.stringify(body))
+}
+
+function sendHtml(response: ServerResponse, status: number, body: string): void {
+  response.writeHead(status, { 'content-type': 'text/html; charset=utf-8' })
+  response.end(body)
+}
+
+function redirect(response: ServerResponse, location: string): void {
+  response.writeHead(307, { location })
+  response.end()
 }
 
 async function shutdown(): Promise<void> {
