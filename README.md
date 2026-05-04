@@ -22,7 +22,9 @@ import { Button } from "@workspace/ui/components/button";
 
 ## Clerk user sync
 
-The API app exposes a Clerk webhook endpoint that stores registered users in the application database:
+The API app is a Hono service. Vercel deploys the default export from `apps/api/src/app.ts`, and routes are registered there.
+
+It exposes a Clerk webhook endpoint that stores registered users in the application database:
 
 ```txt
 POST /api/webhooks/clerk

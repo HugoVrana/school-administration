@@ -2,25 +2,20 @@ import type { UserJSON } from '@clerk/backend'
 import { verifyWebhook, type WebhookEvent } from '@clerk/backend/webhooks'
 import { createDb, type NewUser, type UserRole } from '@school/db'
 import { sql } from 'kysely'
+import { validateApiEnvironment } from '../env.js'
+import { HttpError } from '../errors.js'
 
-const requiredEnv = ['CLERK_WEBHOOK_SIGNING_SECRET', 'PG_URL', 'PG_PORT', 'PG_DATABASE', 'PG_USER', 'PG_PASSWORD', 'PG_CERT']
 const userRoles = ['admin', 'teacher', 'student'] as const
 
 let db: ReturnType<typeof createDb> | undefined
 
 export async function handleClerkWebhookRequest(request: Request): Promise<void> {
-  validateEnvironment()
+  validateApiEnvironment()
 
   const event = await verifyClerkWebhook(request)
 
   if (event.type === 'user.created' || event.type === 'user.updated') {
     await upsertClerkUser(event.data)
-  }
-}
-
-export function validateEnvironment(): void {
-  for (const key of requiredEnv) {
-    if (!process.env[key]) throw new Error(`${key} is not set`)
   }
 }
 
@@ -103,13 +98,4 @@ function parseUserRole(role: unknown): UserRole | null {
   if (userRoles.includes(role as UserRole)) return role as UserRole
 
   return null
-}
-
-export class HttpError extends Error {
-  constructor(
-    readonly status: number,
-    message: string,
-  ) {
-    super(message)
-  }
 }
