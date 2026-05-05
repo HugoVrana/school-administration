@@ -88,7 +88,8 @@ const clerkWebhookRoute = createRoute({
 })
 
 export function registerClerkWebhookRoutes(app: OpenAPIHono): void {
-  app.openapi(clerkWebhookRoute, async (c) => {
+  app.openAPIRegistry.registerPath(clerkWebhookRoute)
+  app.post('/webhooks/clerk', async (c) => {
     const { handleClerkWebhookRequest } = await import('../../services/clerk-user-sync.js')
     const result = await handleClerkWebhookRequest(c.req.raw)
 

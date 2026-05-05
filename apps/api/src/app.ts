@@ -27,7 +27,8 @@ const docsRoute = createRoute({
   },
 })
 
-api.openapi(docsRoute, (c) =>
+api.openAPIRegistry.registerPath(docsRoute)
+api.get('/docs', (c) =>
   c.html(
     SwaggerUI({
       url: '/api/openapi',
