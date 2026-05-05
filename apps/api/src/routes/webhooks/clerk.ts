@@ -1,5 +1,4 @@
 import { createRoute, type OpenAPIHono, z } from '@hono/zod-openapi'
-import { handleClerkWebhookRequest } from '../../services/clerk-user-sync.js'
 import { ErrorResponseSchema } from '../../schemas/common.js'
 
 const SvixHeadersSchema = z.object({
@@ -28,8 +27,17 @@ const SvixHeadersSchema = z.object({
 
 const WebhookReceivedResponseSchema = z
   .object({
+    duplicate: z.boolean().openapi({
+      example: false,
+    }),
+    eventType: z.string().openapi({
+      example: 'user.created',
+    }),
     received: z.boolean().openapi({
       example: true,
+    }),
+    status: z.enum(['received', 'processing', 'processed', 'ignored', 'failed']).openapi({
+      example: 'processed',
     }),
   })
   .openapi('WebhookReceivedResponse')
@@ -80,9 +88,11 @@ const clerkWebhookRoute = createRoute({
 })
 
 export function registerClerkWebhookRoutes(app: OpenAPIHono): void {
-  app.openapi(clerkWebhookRoute, async (c) => {
-    await handleClerkWebhookRequest(c.req.raw)
+  app.openAPIRegistry.registerPath(clerkWebhookRoute)
+  app.post('/webhooks/clerk', async (c) => {
+    const { handleClerkWebhookRequest } = await import('../../services/clerk-user-sync.js')
+    const result = await handleClerkWebhookRequest(c.req.raw)
 
-    return c.json({ received: true }, 200)
+    return c.json(result, 200)
   })
 }
