@@ -1,5 +1,5 @@
 import { SwaggerUI } from '@hono/swagger-ui'
-import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi'
+import { OpenAPIHono, createRoute } from '@hono/zod-openapi'
 import { Hono } from 'hono'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import { HttpError } from './errors.js'
@@ -23,11 +23,6 @@ const docsRoute = createRoute({
   responses: {
     200: {
       description: 'Swagger UI HTML.',
-      content: {
-        'text/html': {
-          schema: z.string(),
-        },
-      },
     },
   },
 })
