@@ -5,7 +5,16 @@
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": ["dist/**", "public/**"]
+      "outputs": ["dist/**", "public/**"],
+      "passThroughEnv": [
+        "CLERK_WEBHOOK_SIGNING_SECRET",
+        "PG_CERT",
+        "PG_DATABASE",
+        "PG_PASSWORD",
+        "PG_PORT",
+        "PG_URL",
+        "PG_USER"
+      ]
     },
     "lint": {
       "dependsOn": ["^lint"]
