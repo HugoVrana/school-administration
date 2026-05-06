@@ -19,18 +19,52 @@ export interface ClerkWebhookResult {
 type DatabaseExecutor = Kysely<Database> | Transaction<Database>
 
 export async function handleClerkWebhookRequest(request: Request): Promise<ClerkWebhookResult> {
-  validateApiEnvironment()
-
+  const startedAt = Date.now()
   const svixId = request.headers.get('svix-id')
 
+  logClerkWebhook('info', 'request received', {
+    contentType: request.headers.get('content-type'),
+    hasSvixSignature: Boolean(request.headers.get('svix-signature')),
+    hasSvixTimestamp: Boolean(request.headers.get('svix-timestamp')),
+    svixId,
+    vercelId: request.headers.get('x-vercel-id'),
+  })
+
+  try {
+    validateApiEnvironment()
+  } catch (error) {
+    logClerkWebhook('error', 'configuration invalid', {
+      durationMs: getDurationMs(startedAt),
+      error: getErrorMessage(error),
+      svixId,
+    })
+    throw error
+  }
+
   if (!svixId) {
+    logClerkWebhook('warn', 'missing svix-id header', {
+      durationMs: getDurationMs(startedAt),
+    })
     throw new HttpError(400, 'Missing svix-id header')
   }
 
-  const event = await verifyClerkWebhook(request)
+  const event = await verifyClerkWebhook(request, startedAt, svixId)
+  logClerkWebhook('info', 'webhook verified', {
+    durationMs: getDurationMs(startedAt),
+    eventType: event.type,
+    svixId,
+  })
+
   const existingEvent = await getWebhookEvent(svixId)
 
   if (existingEvent?.status === 'processed' || existingEvent?.status === 'ignored') {
+    logClerkWebhook('info', 'duplicate delivery skipped', {
+      durationMs: getDurationMs(startedAt),
+      eventType: existingEvent.event_type,
+      status: existingEvent.status,
+      svixId,
+    })
+
     return {
       duplicate: true,
       eventType: existingEvent.event_type,
@@ -39,8 +73,20 @@ export async function handleClerkWebhookRequest(request: Request): Promise<Clerk
     }
   }
 
+  if (existingEvent) {
+    logClerkWebhook('info', 'retrying incomplete delivery', {
+      eventType: existingEvent.event_type,
+      previousStatus: existingEvent.status,
+      svixId,
+    })
+  }
+
   await ensureWebhookEvent(svixId, event)
   await updateWebhookEvent(svixId, 'processing')
+  logClerkWebhook('info', 'delivery marked processing', {
+    eventType: event.type,
+    svixId,
+  })
 
   try {
     const status = await getDb().transaction().execute(async (trx) => {
@@ -51,6 +97,13 @@ export async function handleClerkWebhookRequest(request: Request): Promise<Clerk
       return result
     })
 
+    logClerkWebhook('info', 'delivery completed', {
+      durationMs: getDurationMs(startedAt),
+      eventType: event.type,
+      status,
+      svixId,
+    })
+
     return {
       duplicate: false,
       eventType: event.type,
@@ -58,6 +111,12 @@ export async function handleClerkWebhookRequest(request: Request): Promise<Clerk
       status,
     }
   } catch (error) {
+    logClerkWebhook('error', 'delivery failed', {
+      durationMs: getDurationMs(startedAt),
+      error: getErrorMessage(error),
+      eventType: event.type,
+      svixId,
+    })
     await markWebhookEventFailed(svixId, error)
     throw error
   }
@@ -68,10 +127,15 @@ export async function closeDb(): Promise<void> {
   db = undefined
 }
 
-async function verifyClerkWebhook(request: Request): Promise<WebhookEvent> {
+async function verifyClerkWebhook(request: Request, startedAt: number, svixId: string): Promise<WebhookEvent> {
   try {
     return await verifyWebhook(request)
-  } catch {
+  } catch (error) {
+    logClerkWebhook('warn', 'verification failed', {
+      durationMs: getDurationMs(startedAt),
+      error: getErrorMessage(error),
+      svixId,
+    })
     throw new HttpError(400, 'Webhook verification failed')
   }
 }
@@ -187,6 +251,38 @@ function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message
 
   return 'Unknown webhook processing error'
+}
+
+type ClerkWebhookLogLevel = 'error' | 'info' | 'warn'
+type ClerkWebhookLogValue = boolean | number | string | null | undefined
+
+function logClerkWebhook(level: ClerkWebhookLogLevel, message: string, fields: Record<string, ClerkWebhookLogValue> = {}): void {
+  const payload: Record<string, Exclude<ClerkWebhookLogValue, undefined>> = {
+    message,
+    service: 'clerk-webhook',
+  }
+
+  for (const [key, value] of Object.entries(fields)) {
+    if (value !== undefined) payload[key] = value
+  }
+
+  const line = `[clerk-webhook] ${JSON.stringify(payload)}`
+
+  if (level === 'error') {
+    console.error(line)
+    return
+  }
+
+  if (level === 'warn') {
+    console.warn(line)
+    return
+  }
+
+  console.info(line)
+}
+
+function getDurationMs(startedAt: number): number {
+  return Date.now() - startedAt
 }
 
 function getDb(): ReturnType<typeof createDb> {
