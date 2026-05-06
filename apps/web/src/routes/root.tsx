@@ -3,7 +3,7 @@ import { useAuth, useUser } from "@clerk/react-router"
 import { getRequestedUserRole, getUserRole } from "@/lib/user-role"
 
 export function RootRoute() {
-  const { isLoaded, isSignedIn } = useAuth()
+  const { isLoaded, isSignedIn } = useAuth({ treatPendingAsSignedOut: false })
   const { user } = useUser()
 
   if (!isLoaded) {

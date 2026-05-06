@@ -1,6 +1,7 @@
 import type { FormEvent } from "react"
-import { useState } from "react"
-import { Link, Navigate, useNavigate } from "react-router"
+import { useEffect, useState } from "react"
+import type { NavigateFunction } from "react-router"
+import { Link, useNavigate } from "react-router"
 import { useAuth, useSignUp } from "@clerk/react-router"
 import { Button } from "@workspace/ui/components/base/button"
 import { Input } from "@workspace/ui/components/base/input"
@@ -26,7 +27,7 @@ export function RegisterPage({
   afterRegisterPath = "/",
   loginPath = "/login",
 }: RegisterPageProps) {
-  const { isLoaded, isSignedIn } = useAuth()
+  const { isLoaded, isSignedIn } = useAuth({ treatPendingAsSignedOut: false })
   const { signUp } = useSignUp()
   const navigate = useNavigate()
 
@@ -38,8 +39,14 @@ export function RegisterPage({
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
+  useEffect(() => {
+    if (isLoaded && isSignedIn) {
+      void navigate(afterRegisterPath, { replace: true })
+    }
+  }, [afterRegisterPath, isLoaded, isSignedIn, navigate])
+
   if (!isLoaded) return null
-  if (isSignedIn) return <Navigate to={afterRegisterPath} replace />
+  if (isSignedIn) return null
 
   async function handleRegister(e: FormEvent) {
     e.preventDefault()
@@ -86,14 +93,15 @@ export function RegisterPage({
       return
     }
 
-    const { error: finalizeError } = await signUp.finalize()
+    const { error: finalizeError } = await signUp.finalize({
+      navigate: ({ decorateUrl }) =>
+        navigateToPath(navigate, decorateUrl(afterRegisterPath)),
+    })
     if (finalizeError) {
       setError(finalizeError.message)
       setLoading(false)
       return
     }
-
-    navigate(afterRegisterPath)
   }
 
   return (
@@ -218,4 +226,13 @@ export function RegisterPage({
       </div>
     </div>
   )
+}
+
+function navigateToPath(navigate: NavigateFunction, path: string): void | Promise<void> {
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    window.location.assign(path)
+    return
+  }
+
+  return navigate(path, { replace: true })
 }

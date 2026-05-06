@@ -1,6 +1,7 @@
 import type { FormEvent } from "react"
-import { useState } from "react"
-import { Link, Navigate, useNavigate } from "react-router"
+import { useEffect, useState } from "react"
+import type { NavigateFunction } from "react-router"
+import { Link, useNavigate } from "react-router"
 import { useAuth, useSignIn } from "@clerk/react-router"
 import { Button } from "@workspace/ui/components/base/button"
 import { Input } from "@workspace/ui/components/base/input"
@@ -16,7 +17,7 @@ export function LoginPage({
   afterSignInPath = "/",
   registerPath = "/register",
 }: LoginPageProps) {
-  const { isLoaded, isSignedIn } = useAuth()
+  const { isLoaded, isSignedIn } = useAuth({ treatPendingAsSignedOut: false })
   const { signIn } = useSignIn()
   const navigate = useNavigate()
 
@@ -27,8 +28,14 @@ export function LoginPage({
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
+  useEffect(() => {
+    if (isLoaded && isSignedIn) {
+      void navigate(afterSignInPath, { replace: true })
+    }
+  }, [afterSignInPath, isLoaded, isSignedIn, navigate])
+
   if (!isLoaded) return null
-  if (isSignedIn) return <Navigate to={afterSignInPath} replace />
+  if (isSignedIn) return null
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -42,12 +49,22 @@ export function LoginPage({
         password,
       })
       if (passwordError) {
+        if (isAlreadySignedInError(passwordError)) {
+          await navigateToPath(navigate, afterSignInPath)
+          return
+        }
+
         setError(passwordError.message)
         return
       }
 
       await continueSignIn()
     } catch (err) {
+      if (isAlreadySignedInError(err)) {
+        await navigateToPath(navigate, afterSignInPath)
+        return
+      }
+
       setError(getErrorMessage(err, "Sign in failed"))
     } finally {
       setLoading(false)
@@ -77,13 +94,15 @@ export function LoginPage({
 
   async function continueSignIn() {
     if (signIn.status === "complete") {
-      const { error: finalizeError } = await signIn.finalize()
+      const { error: finalizeError } = await signIn.finalize({
+        navigate: ({ decorateUrl }) =>
+          navigateToPath(navigate, decorateUrl(afterSignInPath)),
+      })
       if (finalizeError) {
         setError(finalizeError.message)
         return
       }
 
-      navigate(afterSignInPath)
       return
     }
 
@@ -228,4 +247,17 @@ function getErrorMessage(error: unknown, fallback: string): string {
   }
 
   return fallback
+}
+
+function isAlreadySignedInError(error: unknown): boolean {
+  return getErrorMessage(error, "").toLowerCase().includes("already signed in")
+}
+
+function navigateToPath(navigate: NavigateFunction, path: string): void | Promise<void> {
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    window.location.assign(path)
+    return
+  }
+
+  return navigate(path, { replace: true })
 }

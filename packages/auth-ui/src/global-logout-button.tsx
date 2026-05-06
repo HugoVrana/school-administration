@@ -9,7 +9,7 @@ export type GlobalLogoutButtonProps = {
 export function GlobalLogoutButton({
   redirectUrl = "/login",
 }: GlobalLogoutButtonProps) {
-  const { isLoaded, isSignedIn } = useAuth()
+  const { isLoaded, isSignedIn } = useAuth({ treatPendingAsSignedOut: false })
 
   if (!isLoaded || !isSignedIn) return null
 
