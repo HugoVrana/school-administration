@@ -4,8 +4,13 @@ import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createAdminDb } from './db.js'
 
-for (const key of ['PG_URL', 'PG_PORT', 'PG_ADMIN_USER', 'PG_ADMIN_PASSWORD', 'PG_DATABASE', 'PG_CERT']) {
-  if (!process.env[key]) throw new Error(`${key} is not set`)
+for (const key of ['PG_URL', 'PG_PORT', 'PG_ADMIN_USER', 'PG_ADMIN_PASSWORD', 'PG_CERT', 'PG_USER', 'PG_DATABASE']) {
+  if (!process.env[key]) {
+    throw new Error(`${key} is not set`);
+  }
+  else  {
+    console.log(`${key} available`)
+  }
 }
 
 const db = createAdminDb()

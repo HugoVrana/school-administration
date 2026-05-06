@@ -56,6 +56,8 @@ Run database migrations with the dedicated migration config:
 pnpm --filter @school/db doppler:migrate
 ```
 
+The migration config must provide `PG_URL`, `PG_PORT`, `PG_DATABASE`, `PG_CERT`, `PG_ADMIN_USER`, `PG_ADMIN_PASSWORD`, and `PG_USER`.
+
 Use the same config for rollback or reset:
 
 ```bash
