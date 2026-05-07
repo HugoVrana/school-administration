@@ -7,7 +7,7 @@ export function StudentLayout() {
   const { user } = useUser()
 
   if (!isLoaded) return null
-  if (!isSignedIn) return <Navigate to="/login" replace />
+  if (!isSignedIn) return <Navigate to="/auth/login" replace />
   if (getUserRole(user) !== "student") return <Navigate to="/" replace />
 
   return <Outlet />

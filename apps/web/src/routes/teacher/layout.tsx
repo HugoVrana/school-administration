@@ -7,7 +7,7 @@ export function TeacherLayout() {
   const { user } = useUser()
 
   if (!isLoaded) return null
-  if (!isSignedIn) return <Navigate to="/login" replace />
+  if (!isSignedIn) return <Navigate to="/auth/login" replace />
   if (getUserRole(user) !== "teacher") return <Navigate to="/" replace />
 
   return <Outlet />

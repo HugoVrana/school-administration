@@ -11,14 +11,14 @@ export function RootRoute() {
   }
 
   if (!isSignedIn) {
-    return <Navigate to="/login" replace />
+    return <Navigate to="/auth/login" replace />
   }
 
   const role = getUserRole(user)
   const requestedRole = getRequestedUserRole(user)
 
   if (role === "admin") {
-    return <Navigate to="/admin" replace />
+    return <Navigate to="/auth/admin" replace />
   }
 
   if (role === "teacher") {

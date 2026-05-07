@@ -7,7 +7,8 @@ import { TeacherLayout } from "./routes/teacher/layout"
 import { TeacherDashboard } from "@/routes/teacher"
 import { StudentLayout } from "./routes/student/layout"
 import { StudentDashboard } from "@/routes/student"
-import {LoginPage, RegisterPage} from "@workspace/auth-ui";
+import { LoginPage, RegisterPage } from "@workspace/auth-ui"
+import { RoleRequestPage } from "@/routes/admin/user-management/role-requests"
 
 export const router = createBrowserRouter([
   {
@@ -18,17 +19,31 @@ export const router = createBrowserRouter([
         element: <RootRoute />,
       },
       {
-        path: "/login",
-        element: <LoginPage />,
-      },
-      {
-        path: "/register",
-        element: <RegisterPage />,
-      },
-      {
-        path: "/admin",
-        element: <AdminLayout />,
-        children: [{ index: true, element: <AdminDashboard /> }],
+        path: "/auth",
+        children: [
+          {
+            path: "login",
+            element: <LoginPage registerPath="/auth/register" />,
+          },
+          {
+            path: "register",
+            element: <RegisterPage loginPath="/auth/login" />,
+          },
+          {
+            path: "admin",
+            element: <AdminLayout />,
+            children: [
+              {
+                index: true,
+                element: <AdminDashboard />,
+              },
+              {
+                path: "user-management/role-requests",
+                element: <RoleRequestPage />,
+              },
+            ],
+          },
+        ],
       },
       {
         path: "/teacher",
