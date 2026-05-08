@@ -1,10 +1,12 @@
 import { createRoute, type OpenAPIHono, z } from '@hono/zod-openapi'
 import { getAllowedCorsOrigin } from '../../env.js'
 import { ErrorResponseSchema } from '../../schemas/common.js'
+import { requireAdminRequest } from '../../services/admin-auth.js'
+import { approveRoleRequest, declineRoleRequest, listRoleRequests } from '../../services/role-requests.js'
 
 const RoleSchema = z.enum(['admin', 'teacher', 'student'])
 
-const RoleRequestUserSchema = z.object({
+const PendingRoleRequestUserSchema = z.object({
   clerkId: z.string().nullable().openapi({
     example: 'user_123',
   }),
@@ -29,13 +31,78 @@ const RoleRequestUserSchema = z.object({
   updatedAt: z.string().openapi({
     example: '2026-05-08T10:30:00.000Z',
   }),
-})
+}).openapi('PendingRoleRequestUser')
+
+const ResolvedRoleRequestUserSchema = PendingRoleRequestUserSchema.extend({
+  requestedRole: RoleSchema.nullable(),
+}).openapi('ResolvedRoleRequestUser')
 
 const RoleRequestsResponseSchema = z.object({
-  roleRequests: z.array(RoleRequestUserSchema),
+  roleRequests: z.array(PendingRoleRequestUserSchema),
 }).openapi('RoleRequestsResponse')
 
-const roleRequestsRoute = createRoute({
+const RoleRequestActionResponseSchema = z.object({
+  user: ResolvedRoleRequestUserSchema,
+}).openapi('RoleRequestActionResponse')
+
+const RoleRequestParamsSchema = z.object({
+  userId: z.coerce.number().int().positive().openapi({
+    param: {
+      name: 'userId',
+      in: 'path',
+    },
+    example: 1,
+  }),
+})
+
+const UnauthorizedResponse = {
+  description: 'Missing or invalid bearer token.',
+  content: {
+    'application/json': {
+      schema: ErrorResponseSchema,
+    },
+  },
+}
+
+const ForbiddenResponse = {
+  description: 'The signed-in user is not an admin.',
+  content: {
+    'application/json': {
+      schema: ErrorResponseSchema,
+    },
+  },
+}
+
+const NotFoundResponse = {
+  description: 'Role request not found.',
+  content: {
+    'application/json': {
+      schema: ErrorResponseSchema,
+    },
+  },
+}
+
+const UnexpectedErrorResponse = {
+  description: 'Unexpected server error.',
+  content: {
+    'application/json': {
+      schema: ErrorResponseSchema,
+    },
+  },
+}
+
+const AdminErrorResponses = {
+  401: UnauthorizedResponse,
+  403: ForbiddenResponse,
+  500: UnexpectedErrorResponse,
+}
+
+const RoleRequestActionErrorResponses = {
+  ...AdminErrorResponses,
+  404: NotFoundResponse,
+}
+
+const listRoleRequestsRoute = createRoute({
   method: 'get',
   path: '/admin/role-requests',
   tags: ['Admin'],
@@ -50,34 +117,81 @@ const roleRequestsRoute = createRoute({
         },
       },
     },
-    401: {
-      description: 'Missing or invalid bearer token.',
+    ...AdminErrorResponses,
+  },
+})
+
+const approveRoleRequestRoute = createRoute({
+  method: 'post',
+  path: '/admin/role-requests/{userId}/approve',
+  request: {
+    params: RoleRequestParamsSchema,
+  },
+  tags: ['Admin'],
+  summary: 'Approve a role request',
+  description: 'Sets role to the requested role and clears requested_role for the selected user.',
+  responses: {
+    200: {
+      description: 'Role request approved.',
       content: {
         'application/json': {
-          schema: ErrorResponseSchema,
+          schema: RoleRequestActionResponseSchema,
         },
       },
     },
-    403: {
-      description: 'The signed-in user is not an admin.',
+    ...RoleRequestActionErrorResponses,
+  },
+})
+
+const declineRoleRequestRoute = createRoute({
+  method: 'post',
+  path: '/admin/role-requests/{userId}/decline',
+  request: {
+    params: RoleRequestParamsSchema,
+  },
+  tags: ['Admin'],
+  summary: 'Decline a role request',
+  description: 'Clears requested_role without changing the selected user role.',
+  responses: {
+    200: {
+      description: 'Role request declined.',
       content: {
         'application/json': {
-          schema: ErrorResponseSchema,
+          schema: RoleRequestActionResponseSchema,
         },
       },
     },
-    500: {
-      description: 'Unexpected server error.',
-      content: {
-        'application/json': {
-          schema: ErrorResponseSchema,
-        },
-      },
-    },
+    ...RoleRequestActionErrorResponses,
   },
 })
 
 export function registerAdminRoleRequestRoutes(app: OpenAPIHono): void {
+  registerAdminCors(app)
+
+  app.openapi(listRoleRequestsRoute, async (c) => {
+    await requireAdminRequest(c.req.raw)
+
+    return c.json({ roleRequests: await listRoleRequests() }, 200)
+  })
+
+  app.openapi(approveRoleRequestRoute, async (c) => {
+    const { userId } = c.req.valid('param')
+
+    await requireAdminRequest(c.req.raw)
+
+    return c.json({ user: await approveRoleRequest(userId) }, 200)
+  })
+
+  app.openapi(declineRoleRequestRoute, async (c) => {
+    const { userId } = c.req.valid('param')
+
+    await requireAdminRequest(c.req.raw)
+
+    return c.json({ user: await declineRoleRequest(userId) }, 200)
+  })
+}
+
+function registerAdminCors(app: OpenAPIHono): void {
   app.use('/admin/*', async (c, next) => {
     const origin = c.req.header('origin')
     const allowedOrigin = origin ? getAllowedCorsOrigin(origin) : undefined
@@ -85,7 +199,7 @@ export function registerAdminRoleRequestRoutes(app: OpenAPIHono): void {
     if (allowedOrigin) {
       c.header('Access-Control-Allow-Origin', allowedOrigin)
       c.header('Access-Control-Allow-Headers', 'Authorization, Content-Type')
-      c.header('Access-Control-Allow-Methods', 'GET, OPTIONS')
+      c.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
       c.header('Access-Control-Max-Age', '600')
       c.header('Vary', 'Origin')
     }
@@ -95,15 +209,5 @@ export function registerAdminRoleRequestRoutes(app: OpenAPIHono): void {
     }
 
     await next()
-  })
-
-  app.openAPIRegistry.registerPath(roleRequestsRoute)
-  app.get('/admin/role-requests', async (c) => {
-    const { requireAdminRequest } = await import('../../services/admin-auth.js')
-    const { listRoleRequests } = await import('../../services/role-requests.js')
-
-    await requireAdminRequest(c.req.raw)
-
-    return c.json({ roleRequests: await listRoleRequests() }, 200)
   })
 }
