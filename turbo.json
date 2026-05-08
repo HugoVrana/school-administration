@@ -15,8 +15,7 @@
         "PG_PASSWORD",
         "PG_PORT",
         "PG_URL",
-        "PG_USER",
-        "VITE_API_BASE_URL"
+        "PG_USER"
       ]
     },
     "lint": {

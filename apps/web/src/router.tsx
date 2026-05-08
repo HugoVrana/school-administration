@@ -9,9 +9,6 @@ import { StudentLayout } from "./routes/student/layout"
 import { StudentDashboard } from "@/routes/student"
 import { LoginPage, RegisterPage, RoleRequestPage } from "@workspace/auth-ui"
 
-const apiBaseUrl =
-  import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "http://localhost:4000" : "")
-
 export const router = createBrowserRouter([
   {
     element: <AppLayout />,
@@ -41,7 +38,7 @@ export const router = createBrowserRouter([
               },
               {
                 path: "user-management/role-requests",
-                element: <RoleRequestPage apiBaseUrl={apiBaseUrl} />,
+                element: <RoleRequestPage />,
               },
             ],
           }
@@ -59,7 +56,7 @@ export const router = createBrowserRouter([
       },
       {
         path : "test",
-        element : <RoleRequestPage apiBaseUrl={apiBaseUrl} />
+        element : <RoleRequestPage />
       }
     ],
   },

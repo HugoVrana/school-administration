@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useAuth } from "@clerk/react-router"
 import { Button } from "@workspace/ui/components/base/button"
 
@@ -19,18 +19,10 @@ type RoleRequestsResponse = {
   roleRequests: RoleRequestUser[]
 }
 
-export type RoleRequestPageProps = {
-  apiBaseUrl?: string
-}
-
-export function RoleRequestPage({ apiBaseUrl = "" }: RoleRequestPageProps) {
+export function RoleRequestPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth({
     treatPendingAsSignedOut: false,
   })
-  const endpoint = useMemo(
-    () => buildApiUrl(apiBaseUrl, "/api/admin/role-requests"),
-    [apiBaseUrl]
-  )
 
   const [roleRequests, setRoleRequests] = useState<RoleRequestUser[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -46,7 +38,7 @@ export function RoleRequestPage({ apiBaseUrl = "" }: RoleRequestPageProps) {
 
         if (!token) throw new Error("Missing session token")
 
-        const response = await fetch(endpoint, {
+        const response = await fetch("/api/admin/role-requests", {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -63,7 +55,7 @@ export function RoleRequestPage({ apiBaseUrl = "" }: RoleRequestPageProps) {
         setLoading(false)
       }
     },
-    [endpoint, getToken]
+    [getToken]
   )
 
   useEffect(() => {
@@ -154,12 +146,6 @@ export function RoleRequestPage({ apiBaseUrl = "" }: RoleRequestPageProps) {
       </div>
     </main>
   )
-}
-
-function buildApiUrl(apiBaseUrl: string, path: string): string {
-  const baseUrl = apiBaseUrl.trim().replace(/\/+$/, "")
-
-  return `${baseUrl}${path}`
 }
 
 async function readRoleRequestsResponse(

@@ -87,11 +87,10 @@ GET /api/admin/role-requests
 
 The frontend sends a Clerk session token as `Authorization: Bearer <token>`. The API verifies that token with `CLERK_SECRET_KEY`, looks up the synced user by `users.clerk_id`, and only returns users with `requested_role is not null` when the caller has `role = admin`.
 
-If the web app and API are deployed on different origins, configure:
+The web app calls `/api/admin/role-requests` on its own origin. In local development, Vite proxies `/api` to `http://localhost:4000` by default. To override the local proxy target, set:
 
 ```txt
-API_CORS_ORIGINS=https://{web-project-domain}
-VITE_API_BASE_URL=https://{api-project-domain}
+VITE_API_PROXY_TARGET=https://{api-project-domain}
 ```
 
-For local development, the API allows `http://localhost:5173` and `http://127.0.0.1:5173` by default.
+In Vercel, `apps/web/vercel.json` rewrites `/api/:path*` to the API project so browser requests stay same-origin and do not require CORS.
