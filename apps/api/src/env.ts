@@ -51,7 +51,7 @@ export function getClerkSecretKey(): string {
 
 export function getAllowedCorsOrigin(origin: string): string | undefined {
   const configuredOrigins = process.env.API_CORS_ORIGINS?.split(',').map((value) => value.trim()).filter(Boolean) ?? []
-  const allowedOrigins = configuredOrigins.length > 0 ? configuredOrigins : defaultCorsOrigins
+  const allowedOrigins = [...new Set([...defaultCorsOrigins, ...configuredOrigins])]
 
   return allowedOrigins.includes(origin) ? origin : undefined
 }
