@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://school-administration-frontend-kpo0qo0ro-hugovranas-projects.vercel.app/api/:path*"
+      "destination": "https://school-administration-frontend-api.vercel.app/api/:path*"
     },
     {
       "source": "/(.*)",
