@@ -1,5 +1,4 @@
 import { createRoute, type OpenAPIHono, z } from '@hono/zod-openapi'
-import { cors } from 'hono/cors'
 import { getAllowedCorsOrigin } from '../../env.js'
 import { ErrorResponseSchema } from '../../schemas/common.js'
 
@@ -79,12 +78,24 @@ const roleRequestsRoute = createRoute({
 })
 
 export function registerAdminRoleRequestRoutes(app: OpenAPIHono): void {
-  app.use('/admin/*', cors({
-    allowHeaders: ['Authorization', 'Content-Type'],
-    allowMethods: ['GET', 'OPTIONS'],
-    maxAge: 600,
-    origin: (origin) => getAllowedCorsOrigin(origin),
-  }))
+  app.use('/admin/*', async (c, next) => {
+    const origin = c.req.header('origin')
+    const allowedOrigin = origin ? getAllowedCorsOrigin(origin) : undefined
+
+    if (allowedOrigin) {
+      c.header('Access-Control-Allow-Origin', allowedOrigin)
+      c.header('Access-Control-Allow-Headers', 'Authorization, Content-Type')
+      c.header('Access-Control-Allow-Methods', 'GET, OPTIONS')
+      c.header('Access-Control-Max-Age', '600')
+      c.header('Vary', 'Origin')
+    }
+
+    if (c.req.method === 'OPTIONS') {
+      return c.body(null, 204)
+    }
+
+    await next()
+  })
 
   app.openAPIRegistry.registerPath(roleRequestsRoute)
   app.get('/admin/role-requests', async (c) => {
