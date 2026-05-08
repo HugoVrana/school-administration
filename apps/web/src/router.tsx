@@ -7,8 +7,10 @@ import { TeacherLayout } from "./routes/teacher/layout"
 import { TeacherDashboard } from "@/routes/teacher"
 import { StudentLayout } from "./routes/student/layout"
 import { StudentDashboard } from "@/routes/student"
-import { LoginPage, RegisterPage } from "@workspace/auth-ui"
-import { RoleRequestPage } from "@/routes/admin/user-management/role-requests"
+import { LoginPage, RegisterPage, RoleRequestPage } from "@workspace/auth-ui"
+
+const apiBaseUrl =
+  import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "http://localhost:4000" : "")
 
 export const router = createBrowserRouter([
   {
@@ -39,10 +41,10 @@ export const router = createBrowserRouter([
               },
               {
                 path: "user-management/role-requests",
-                element: <RoleRequestPage />,
+                element: <RoleRequestPage apiBaseUrl={apiBaseUrl} />,
               },
             ],
-          },
+          }
         ],
       },
       {
@@ -55,6 +57,10 @@ export const router = createBrowserRouter([
         element: <StudentLayout />,
         children: [{ index: true, element: <StudentDashboard /> }],
       },
+      {
+        path : "test",
+        element : <RoleRequestPage apiBaseUrl={apiBaseUrl} />
+      }
     ],
   },
 ])

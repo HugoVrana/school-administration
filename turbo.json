@@ -7,13 +7,16 @@
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": ["dist/**", "public/**"],
       "passThroughEnv": [
+        "API_CORS_ORIGINS",
+        "CLERK_SECRET_KEY",
         "CLERK_WEBHOOK_SIGNING_SECRET",
         "PG_CERT",
         "PG_DATABASE",
         "PG_PASSWORD",
         "PG_PORT",
         "PG_URL",
-        "PG_USER"
+        "PG_USER",
+        "VITE_API_BASE_URL"
       ]
     },
     "lint": {
@@ -32,6 +35,9 @@
     "doppler:run": {
       "cache": false,
       "persistent": true
+    },
+    "doppler:pull": {
+      "cache": false
     }
   }
 }

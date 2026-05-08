@@ -1,6 +1,6 @@
 import { serve } from '@hono/node-server'
 import app from './app.js'
-import { closeDb } from './services/clerk-user-sync.js'
+import { closeDb } from './services/database.js'
 
 const port = Number(process.env.PORT ?? 4000)
 

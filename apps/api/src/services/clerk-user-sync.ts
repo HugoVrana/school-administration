@@ -1,13 +1,12 @@
 import type { UserJSON } from '@clerk/backend'
 import { verifyWebhook, type WebhookEvent } from '@clerk/backend/webhooks'
-import { createDb, type ClerkWebhookEventStatus, type Database, type NewUser, type UserRole } from '@school/db'
+import type { ClerkWebhookEventStatus, Database, NewUser, UserRole } from '@school/db'
 import { sql, type Kysely, type Transaction } from 'kysely'
 import { getClerkWebhookSigningSecret, validateApiEnvironment } from '../env.js'
 import { HttpError } from '../errors.js'
+import { getDb } from './database.js'
 
 const userRoles = ['admin', 'teacher', 'student'] as const
-
-let db: ReturnType<typeof createDb> | undefined
 
 export interface ClerkWebhookResult {
   duplicate: boolean
@@ -170,11 +169,6 @@ export async function handleClerkWebhookRequest(request: Request): Promise<Clerk
     await markWebhookEventFailed(svixId, error)
     throw error
   }
-}
-
-export async function closeDb(): Promise<void> {
-  await db?.destroy()
-  db = undefined
 }
 
 async function verifyClerkWebhook(request: Request, startedAt: number, svixId: string, signingSecret: string): Promise<WebhookEvent> {
@@ -378,12 +372,6 @@ function logClerkWebhook(level: ClerkWebhookLogLevel, message: string, fields: R
 
 function getDurationMs(startedAt: number): number {
   return Date.now() - startedAt
-}
-
-function getDb(): ReturnType<typeof createDb> {
-  db ??= createDb()
-
-  return db
 }
 
 function getPrimaryEmail(user: UserJSON): string | undefined {

@@ -76,3 +76,22 @@ https://{api-project-domain}/api/webhooks/clerk
 ```
 
 Keep the API project's Output Directory set to `public`. The API app includes an empty `public` directory because Vercel still expects one for an API-only project using the Other framework preset.
+
+## Admin role requests
+
+The admin role request page calls:
+
+```txt
+GET /api/admin/role-requests
+```
+
+The frontend sends a Clerk session token as `Authorization: Bearer <token>`. The API verifies that token with `CLERK_SECRET_KEY`, looks up the synced user by `users.clerk_id`, and only returns users with `requested_role is not null` when the caller has `role = admin`.
+
+If the web app and API are deployed on different origins, configure:
+
+```txt
+API_CORS_ORIGINS=https://{web-project-domain}
+VITE_API_BASE_URL=https://{api-project-domain}
+```
+
+For local development, the API allows `http://localhost:5173` and `http://127.0.0.1:5173` by default.

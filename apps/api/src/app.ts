@@ -3,6 +3,7 @@ import { OpenAPIHono, createRoute } from '@hono/zod-openapi'
 import { Hono } from 'hono'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import { HttpError } from './errors.js'
+import { registerAdminRoleRequestRoutes } from './routes/admin/role-requests.js'
 import { registerHealthRoutes } from './routes/health.js'
 import { registerClerkWebhookRoutes } from './routes/webhooks/clerk.js'
 import { ErrorResponseSchema } from './schemas/common.js'
@@ -40,6 +41,7 @@ api.get('/docs', (c) =>
 
 registerHealthRoutes(api)
 registerClerkWebhookRoutes(api)
+registerAdminRoleRequestRoutes(api)
 
 api.doc31('/openapi', {
   openapi: '3.1.0',
@@ -49,6 +51,10 @@ api.doc31('/openapi', {
     description: 'API endpoints for the school administration application.',
   },
   tags: [
+    {
+      name: 'Admin',
+      description: 'Administrative endpoints',
+    },
     {
       name: 'System',
       description: 'Operational endpoints',
