@@ -2,7 +2,7 @@ import type { UserJSON } from '@clerk/backend'
 import { verifyWebhook, type WebhookEvent } from '@clerk/backend/webhooks'
 import { createDb, type ClerkWebhookEventStatus, type Database, type NewUser, type UserRole } from '@school/db'
 import { sql, type Kysely, type Transaction } from 'kysely'
-import { validateApiEnvironment } from '../env.js'
+import { getClerkWebhookSigningSecret, validateApiEnvironment } from '../env.js'
 import { HttpError } from '../errors.js'
 
 const userRoles = ['admin', 'teacher', 'student'] as const
@@ -23,15 +23,30 @@ export async function handleClerkWebhookRequest(request: Request): Promise<Clerk
   const svixId = request.headers.get('svix-id')
 
   logClerkWebhook('info', 'request received', {
+    contentLength: request.headers.get('content-length'),
     contentType: request.headers.get('content-type'),
     hasSvixSignature: Boolean(request.headers.get('svix-signature')),
     hasSvixTimestamp: Boolean(request.headers.get('svix-timestamp')),
+    method: request.method,
     svixId,
+    url: request.url,
+    vercelRegion: process.env.VERCEL_REGION,
     vercelId: request.headers.get('x-vercel-id'),
   })
 
+  let signingSecret: string
+
   try {
     validateApiEnvironment()
+    signingSecret = getClerkWebhookSigningSecret()
+    logClerkWebhook('info', 'configuration valid', {
+      durationMs: getDurationMs(startedAt),
+      signingSecretBodyLengthMod4: (signingSecret.length - 'whsec_'.length) % 4,
+      signingSecretLength: signingSecret.length,
+      svixId,
+      vercelEnv: process.env.VERCEL_ENV,
+      vercelRegion: process.env.VERCEL_REGION,
+    })
   } catch (error) {
     logClerkWebhook('error', 'configuration invalid', {
       durationMs: getDurationMs(startedAt),
@@ -48,14 +63,31 @@ export async function handleClerkWebhookRequest(request: Request): Promise<Clerk
     throw new HttpError(400, 'Missing svix-id header')
   }
 
-  const event = await verifyClerkWebhook(request, startedAt, svixId)
+  logClerkWebhook('info', 'verification started', {
+    durationMs: getDurationMs(startedAt),
+    svixId,
+  })
+
+  const event = await verifyClerkWebhook(request, startedAt, svixId, signingSecret)
   logClerkWebhook('info', 'webhook verified', {
     durationMs: getDurationMs(startedAt),
     eventType: event.type,
     svixId,
   })
 
+  logClerkWebhook('info', 'idempotency lookup started', {
+    durationMs: getDurationMs(startedAt),
+    eventType: event.type,
+    svixId,
+  })
   const existingEvent = await getWebhookEvent(svixId)
+  logClerkWebhook('info', 'idempotency lookup completed', {
+    durationMs: getDurationMs(startedAt),
+    eventType: event.type,
+    existingStatus: existingEvent?.status,
+    foundExistingDelivery: Boolean(existingEvent),
+    svixId,
+  })
 
   if (existingEvent?.status === 'processed' || existingEvent?.status === 'ignored') {
     logClerkWebhook('info', 'duplicate delivery skipped', {
@@ -82,17 +114,35 @@ export async function handleClerkWebhookRequest(request: Request): Promise<Clerk
   }
 
   await ensureWebhookEvent(svixId, event)
+  logClerkWebhook('info', 'delivery recorded', {
+    durationMs: getDurationMs(startedAt),
+    eventType: event.type,
+    svixId,
+  })
   await updateWebhookEvent(svixId, 'processing')
   logClerkWebhook('info', 'delivery marked processing', {
+    durationMs: getDurationMs(startedAt),
     eventType: event.type,
     svixId,
   })
 
   try {
     const status = await getDb().transaction().execute(async (trx) => {
-      const result = await processClerkEvent(event, trx)
+      logClerkWebhook('info', 'transaction started', {
+        durationMs: getDurationMs(startedAt),
+        eventType: event.type,
+        svixId,
+      })
+
+      const result = await processClerkEvent(event, trx, startedAt, svixId)
 
       await markWebhookEventCompleted(trx, svixId, result)
+      logClerkWebhook('info', 'delivery status persisted', {
+        durationMs: getDurationMs(startedAt),
+        eventType: event.type,
+        status: result,
+        svixId,
+      })
 
       return result
     })
@@ -127,9 +177,9 @@ export async function closeDb(): Promise<void> {
   db = undefined
 }
 
-async function verifyClerkWebhook(request: Request, startedAt: number, svixId: string): Promise<WebhookEvent> {
+async function verifyClerkWebhook(request: Request, startedAt: number, svixId: string, signingSecret: string): Promise<WebhookEvent> {
   try {
-    return await verifyWebhook(request)
+    return await verifyWebhook(request, { signingSecret })
   } catch (error) {
     logClerkWebhook('warn', 'verification failed', {
       durationMs: getDurationMs(startedAt),
@@ -140,17 +190,39 @@ async function verifyClerkWebhook(request: Request, startedAt: number, svixId: s
   }
 }
 
-async function processClerkEvent(event: WebhookEvent, trx: Transaction<Database>): Promise<'processed' | 'ignored'> {
+async function processClerkEvent(event: WebhookEvent, trx: Transaction<Database>, startedAt: number, svixId: string): Promise<'processed' | 'ignored'> {
+  logClerkWebhook('info', 'event processing started', {
+    durationMs: getDurationMs(startedAt),
+    eventType: event.type,
+    svixId,
+  })
+
   if (event.type === 'user.created' || event.type === 'user.updated') {
-    await upsertClerkUser(event.data, trx)
+    await upsertClerkUser(event.data, trx, startedAt, svixId, event.type)
     return 'processed'
   }
+
+  logClerkWebhook('info', 'event ignored', {
+    durationMs: getDurationMs(startedAt),
+    eventType: event.type,
+    svixId,
+  })
 
   return 'ignored'
 }
 
-async function upsertClerkUser(user: UserJSON, db: DatabaseExecutor): Promise<void> {
+async function upsertClerkUser(user: UserJSON, db: DatabaseExecutor, startedAt: number, svixId: string, eventType: string): Promise<void> {
   const email = getPrimaryEmail(user)
+
+  logClerkWebhook('info', 'user sync started', {
+    clerkUserId: user.id,
+    durationMs: getDurationMs(startedAt),
+    eventType,
+    hasPrimaryEmail: Boolean(email),
+    requestedRole: parseUserRole(user.unsafe_metadata.requestedRole),
+    role: parseUserRole(user.public_metadata.role),
+    svixId,
+  })
 
   if (!email) {
     throw new HttpError(422, `Clerk user ${user.id} does not have an email address`)
@@ -170,12 +242,27 @@ async function upsertClerkUser(user: UserJSON, db: DatabaseExecutor): Promise<vo
     .where('clerk_id', '=', user.id)
     .executeTakeFirst()
 
+  logClerkWebhook('info', 'user lookup completed', {
+    clerkUserId: user.id,
+    durationMs: getDurationMs(startedAt),
+    eventType,
+    foundExistingUser: Boolean(existingUser),
+    svixId,
+  })
+
   if (existingUser) {
     await db
       .updateTable('users')
       .set({ ...syncedUser, updated_at: sql<Date>`now()` })
       .where('id', '=', existingUser.id)
       .execute()
+    logClerkWebhook('info', 'user sync completed', {
+      clerkUserId: user.id,
+      durationMs: getDurationMs(startedAt),
+      eventType,
+      operation: 'updated-by-clerk-id',
+      svixId,
+    })
     return
   }
 
@@ -189,6 +276,14 @@ async function upsertClerkUser(user: UserJSON, db: DatabaseExecutor): Promise<vo
       }),
     )
     .execute()
+
+  logClerkWebhook('info', 'user sync completed', {
+    clerkUserId: user.id,
+    durationMs: getDurationMs(startedAt),
+    eventType,
+    operation: 'inserted-or-updated-by-email',
+    svixId,
+  })
 }
 
 async function getWebhookEvent(svixId: string) {

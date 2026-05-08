@@ -65,7 +65,7 @@ pnpm --filter @school/db doppler:rollback
 pnpm --filter @school/db doppler:reset
 ```
 
-Configure a Clerk webhook for `user.created` and `user.updated`, then set `CLERK_WEBHOOK_SIGNING_SECRET` along with the existing `PG_*` database environment variables for the API app.
+Configure a Clerk webhook for `user.created` and `user.updated`, then set `CLERK_WEBHOOK_SIGNING_SECRET` along with the existing `PG_*` database environment variables for the API app. The value must be only the Clerk webhook signing secret that starts with `whsec_`; do not include `CLERK_WEBHOOK_SIGNING_SECRET=`, quotes, or dashboard label text in the secret value.
 
 For Vercel, Doppler must sync secrets into the API Vercel project environment. Running the build through Doppler is not enough for runtime serverless functions; `process.env` in the deployed function reads Vercel project environment variables.
 
