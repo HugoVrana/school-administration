@@ -1,6 +1,7 @@
-import type { UserRole } from '@school/db'
-import { sql } from 'kysely'
+import type { Database, UserRole } from '@school/db'
+import { sql, type Transaction } from 'kysely'
 import { HttpError } from '../errors.js'
+import { assignClerkUserRole, clearClerkUserRequestedRole } from './clerk-user-metadata.js'
 import { getDb } from './database.js'
 
 const roleRequestUserColumns = [
@@ -24,6 +25,8 @@ interface RoleRequestUserRow {
   role: UserRole | null
   updated_at: Date
 }
+
+type RoleRequestTransaction = Transaction<Database>
 
 export interface ResolvedRoleRequestUser {
   clerkId: string | null
@@ -59,34 +62,79 @@ export async function listRoleRequests(): Promise<RoleRequestUser[]> {
 }
 
 export async function approveRoleRequest(userId: number): Promise<ResolvedRoleRequestUser> {
-  const user = await getDb()
-    .updateTable('users')
-    .set((eb) => ({
-      role: eb.ref('requested_role'),
-      requested_role: null,
-      updated_at: sql<Date>`now()`,
-    }))
-    .where('id', '=', userId)
-    .where('requested_role', 'is not', null)
-    .returning(roleRequestUserColumns)
-    .executeTakeFirst()
+  return getDb().transaction().execute(async (trx) => {
+    const user = await getPendingRoleRequest(userId, trx)
+    const clerkId = getRequiredClerkId(user)
+    const requestedRole = getRequiredRequestedRole(user)
 
-  return toExistingRoleRequestUser(user)
+    await assignClerkUserRole(clerkId, requestedRole)
+
+    const updatedUser = await trx
+      .updateTable('users')
+      .set({
+        role: requestedRole,
+        requested_role: null,
+        updated_at: sql<Date>`now()`,
+      })
+      .where('id', '=', userId)
+      .returning(roleRequestUserColumns)
+      .executeTakeFirst()
+
+    return toExistingRoleRequestUser(updatedUser)
+  })
 }
 
 export async function declineRoleRequest(userId: number): Promise<ResolvedRoleRequestUser> {
-  const user = await getDb()
-    .updateTable('users')
-    .set({
-      requested_role: null,
-      updated_at: sql<Date>`now()`,
-    })
+  return getDb().transaction().execute(async (trx) => {
+    const user = await getPendingRoleRequest(userId, trx)
+    const clerkId = getRequiredClerkId(user)
+
+    await clearClerkUserRequestedRole(clerkId)
+
+    const updatedUser = await trx
+      .updateTable('users')
+      .set({
+        requested_role: null,
+        updated_at: sql<Date>`now()`,
+      })
+      .where('id', '=', userId)
+      .returning(roleRequestUserColumns)
+      .executeTakeFirst()
+
+    return toExistingRoleRequestUser(updatedUser)
+  })
+}
+
+async function getPendingRoleRequest(userId: number, db: RoleRequestTransaction): Promise<RoleRequestUserRow> {
+  const user = await db
+    .selectFrom('users')
+    .select(roleRequestUserColumns)
     .where('id', '=', userId)
     .where('requested_role', 'is not', null)
-    .returning(roleRequestUserColumns)
+    .forUpdate()
     .executeTakeFirst()
 
-  return toExistingRoleRequestUser(user)
+  if (!user) {
+    throw new HttpError(404, 'Role request not found')
+  }
+
+  return user
+}
+
+function getRequiredClerkId(user: RoleRequestUserRow): string {
+  if (!user.clerk_id) {
+    throw new HttpError(409, 'Role request user is not linked to a Clerk user')
+  }
+
+  return user.clerk_id
+}
+
+function getRequiredRequestedRole(user: RoleRequestUserRow): UserRole {
+  if (!user.requested_role) {
+    throw new HttpError(404, 'Role request not found')
+  }
+
+  return user.requested_role
 }
 
 function toExistingRoleRequestUser(user: RoleRequestUserRow | undefined): ResolvedRoleRequestUser {

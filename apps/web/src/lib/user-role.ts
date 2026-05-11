@@ -12,7 +12,7 @@ const userRoles = ["admin", "teacher", "student"] as const
 export function getUserRole(
   user: UserWithRoleMetadata | null | undefined
 ): UserRole | undefined {
-  const publicRole = user?.unsafeMetadata?.role
+  const publicRole = user?.publicMetadata?.role
 
   if (isUserRole(publicRole)) {
     return publicRole

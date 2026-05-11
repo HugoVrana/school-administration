@@ -19,6 +19,8 @@ type RoleRequestsResponse = {
   roleRequests: RoleRequestUser[]
 }
 
+type RoleRequestAction = "approve" | "decline"
+
 export function RoleRequestPage() {
   const { getToken, isLoaded, isSignedIn } = useAuth({
     treatPendingAsSignedOut: false,
@@ -50,6 +52,37 @@ export function RoleRequestPage() {
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return
 
+        setError(getErrorMessage(err))
+      } finally {
+        setLoading(false)
+      }
+    },
+    [getToken]
+  )
+
+  const handleRoleRequestAction = useCallback(
+    async (userId: number, action: RoleRequestAction) => {
+      setLoading(true)
+      setError(null)
+
+      try {
+        const token = await getToken()
+
+        if (!token) throw new Error("Missing session token")
+
+        const response = await fetch(`/api/admin/role-requests/${userId}/${action}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          method: "POST",
+        })
+
+        await readRoleRequestActionResponse(response)
+
+        setRoleRequests((requests) =>
+          requests.filter((request) => request.id !== userId)
+        )
+      } catch (err) {
         setError(getErrorMessage(err))
       } finally {
         setLoading(false)
@@ -106,6 +139,7 @@ export function RoleRequestPage() {
                 <th className="px-4 py-3">Current role</th>
                 <th className="px-4 py-3">Requested role</th>
                 <th className="px-4 py-3">Requested</th>
+                <th className="px-4 py-3">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border bg-background">
@@ -119,7 +153,7 @@ export function RoleRequestPage() {
                       {request.email}
                     </div>
                   </td>
-                  <td className="px-4 py-3 capitalize">
+                  <td className="flex gap-2 px-4 py-3 capitalize">
                     {request.role ?? "None"}
                   </td>
                   <td className="px-4 py-3 capitalize">
@@ -128,13 +162,34 @@ export function RoleRequestPage() {
                   <td className="px-4 py-3 text-muted-foreground">
                     {formatDate(request.createdAt)}
                   </td>
+                  <td className="px-4 py-3 capitalize">
+                    <Button
+                      type="button"
+                      onClick={() =>
+                        void handleRoleRequestAction(request.id, "approve")
+                      }
+                      disabled={loading}
+                    >
+                      Approve
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() =>
+                        void handleRoleRequestAction(request.id, "decline")
+                      }
+                      disabled={loading}
+                    >
+                      Decline
+                    </Button>
+                  </td>
                 </tr>
               ))}
               {!loading && roleRequests.length === 0 && (
                 <tr>
                   <td
                     className="px-4 py-8 text-center text-muted-foreground"
-                    colSpan={4}
+                    colSpan={5}
                   >
                     No role requests found.
                   </td>
@@ -173,6 +228,22 @@ async function readRoleRequestsResponse(
 
   return {
     roleRequests: body.roleRequests,
+  }
+}
+
+async function readRoleRequestActionResponse(response: Response): Promise<void> {
+  const contentType = response.headers.get("content-type") ?? ""
+
+  if (!contentType.includes("application/json")) {
+    throw new Error(
+      `Expected JSON from ${response.url}, but received ${contentType || "unknown content type"}`
+    )
+  }
+
+  const body = (await response.json()) as { error?: string }
+
+  if (!response.ok) {
+    throw new Error(body.error ?? `Request failed with status ${response.status}`)
   }
 }
 

@@ -82,6 +82,15 @@ const NotFoundResponse = {
   },
 }
 
+const ConflictResponse = {
+  description: 'Role request user is not linked to a Clerk user.',
+  content: {
+    'application/json': {
+      schema: ErrorResponseSchema,
+    },
+  },
+}
+
 const UnexpectedErrorResponse = {
   description: 'Unexpected server error.',
   content: {
@@ -99,6 +108,7 @@ const AdminErrorResponses = {
 
 const RoleRequestActionErrorResponses = {
   ...AdminErrorResponses,
+  409: ConflictResponse,
   404: NotFoundResponse,
 }
 
