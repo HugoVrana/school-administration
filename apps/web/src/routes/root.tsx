@@ -16,17 +16,17 @@ export function RootRoute() {
 
   const role = getUserRole(user)
   const requestedRole = getRequestedUserRole(user)
-
+  console.log("Role : " + role)
   if (role === "admin") {
     return <Navigate to="/auth/admin" replace />
   }
 
   if (role === "teacher") {
-    return <Navigate to="/teacher" replace/>
+    return <Navigate to="/teacher" replace />
   }
 
   if (role === "student") {
-    return <Navigate to="/student" replace/>
+    return <Navigate to="/student" replace />
   }
 
   return (

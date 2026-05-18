@@ -12,6 +12,9 @@ const userRoles = ["admin", "teacher", "student"] as const
 export function getUserRole(
   user: UserWithRoleMetadata | null | undefined
 ): UserRole | undefined {
+  console.log("unsafe metadata " + user?.unsafeMetadata?.json())
+  console.log("safe metadata " + user?.publicMetadata?.toString())
+  console.log("meta data role : " + user?.publicMetadata?.role)
   const publicRole = user?.publicMetadata?.role
 
   if (isUserRole(publicRole)) {

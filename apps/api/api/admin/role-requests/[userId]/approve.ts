@@ -1,5 +1,5 @@
-import { handle } from 'hono/vercel'
-import app from '../../../../src/app.js'
+import { handle } from "hono/vercel"
+import app from "../../../../src/app.js"
 
 export const POST = handle(app)
 export const OPTIONS = handle(app)
